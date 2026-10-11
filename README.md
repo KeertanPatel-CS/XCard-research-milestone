@@ -41,6 +41,31 @@ The challenge includes:
 - A replay option that generates a different scenario order.
 - Haptic feedback on supported mobile devices.
 
+## Screenshots
+### Mobile rewards calculator
+
+The user enters purchase information, compares the stored reward rules, and receives a ranked card recommendation. Amount cannot be $0, otherwise error message shows up.
+
+Phone:
+
+<img width="736" height="1600" alt="image" src="https://github.com/user-attachments/assets/94bf6bf5-2bec-444f-be30-8a4ca8b75cd8" />
+<img width="736" height="1600" alt="image" src="https://github.com/user-attachments/assets/241e070c-658c-418f-9804-486b40e20aef" />
+
+### Interactive rewards challenge
+The challenge tests whether the user can identify the highest-earning card. It provides immediate feedback, tracks the score and streak, and produces a final result.
+
+<img width="736" height="1600" alt="image" src="https://github.com/user-attachments/assets/165ce155-b574-4740-910b-6bc217f23d2f" />
+<img width="736" height="1600" alt="image" src="https://github.com/user-attachments/assets/8831aff0-bf4a-43dd-b2d3-642d35b4d604" />
+<img width="736" height="1600" alt="image" src="https://github.com/user-attachments/assets/9121ab56-fed3-40a8-80e8-aaf026429639" />
+
+### Web version
+The same Expo project also runs in a browser with platform-specific web navigation.
+
+Web:
+
+<img width="975" height="576" alt="image" src="https://github.com/user-attachments/assets/1bbe8a96-1ac7-4ee7-a6ee-0e9d228b8842" />
+<img width="975" height="581" alt="image" src="https://github.com/user-attachments/assets/296bb088-f9d5-4083-91b0-eeec0caeb564" />
+
 ## Technology Stack
 
 | Technology | Purpose |
@@ -206,6 +231,5 @@ A production XCard application would need:
 React Native, Expo, TypeScript, Expo Router, and npm successfully supported a prototype with user input, validation, calculations, navigation, randomized interactions, device feedback, and dynamic results. The experiment supports using this stack for the XCard team project while recognizing that advanced native integrations may later require Expo development builds or custom native configuration.
 
 ## Author
-
 Keertan Patel  
 CSCE 490 Research Milestone
