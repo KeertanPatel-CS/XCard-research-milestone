@@ -1,180 +1,666 @@
-import { Image } from 'expo-image';
-import { SymbolView } from 'expo-symbols';
-import { Platform, Pressable, ScrollView, StyleSheet } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Haptics from 'expo-haptics';
+import { StatusBar } from 'expo-status-bar';
+import { useRef, useState } from 'react';
+import {
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 
-import { ExternalLink } from '@/components/external-link';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Collapsible } from '@/components/ui/collapsible';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+type Category = 'Dining' | 'Travel' | 'Groceries' | 'Gas';
 
-export default function TabTwoScreen() {
-  const safeAreaInsets = useSafeAreaInsets();
-  const insets = {
-    ...safeAreaInsets,
-    bottom: safeAreaInsets.bottom + BottomTabInset + Spacing.three,
-  };
-  const theme = useTheme();
+type RewardCard = {
+  id: string;
+  name: string;
+  lastFour: string;
+  rates: Record<Category, number>;
+};
 
-  const contentPlatformStyle = Platform.select({
-    android: {
-      paddingTop: insets.top,
-      paddingLeft: insets.left,
-      paddingRight: insets.right,
-      paddingBottom: insets.bottom,
+type Scenario = {
+  id: string;
+  merchant: string;
+  description: string;
+  amount: number;
+  category: Category;
+};
+
+const totalRounds = 5;
+
+const cards: RewardCard[] = [
+  {
+    id: 'amber',
+    name: 'Amber Dining+',
+    lastFour: '4821',
+    rates: {
+      Dining: 4,
+      Travel: 2,
+      Groceries: 1,
+      Gas: 1,
     },
-    web: {
-      paddingTop: Spacing.six,
-      paddingBottom: Spacing.four,
+  },
+  {
+    id: 'horizon',
+    name: 'Horizon Travel',
+    lastFour: '1190',
+    rates: {
+      Dining: 2,
+      Travel: 3,
+      Groceries: 1,
+      Gas: 1,
     },
+  },
+  {
+    id: 'everyday',
+    name: 'EveryDay Cash',
+    lastFour: '7734',
+    rates: {
+      Dining: 2,
+      Travel: 1,
+      Groceries: 5,
+      Gas: 3,
+    },
+  },
+];
+
+const scenarioBank: Scenario[] = [
+  {
+    id: 'coffee',
+    merchant: 'Starbucks',
+    description: 'Morning coffee with friends',
+    amount: 24,
+    category: 'Dining',
+  },
+  {
+    id: 'flight',
+    merchant: 'Delta Air Lines',
+    description: 'A domestic flight',
+    amount: 320,
+    category: 'Travel',
+  },
+  {
+    id: 'groceries',
+    merchant: 'Kroger',
+    description: 'Weekly grocery shopping',
+    amount: 86,
+    category: 'Groceries',
+  },
+  {
+    id: 'fuel',
+    merchant: 'Shell',
+    description: 'A tank of gas',
+    amount: 55,
+    category: 'Gas',
+  },
+  {
+    id: 'restaurant',
+    merchant: 'Olive Garden',
+    description: 'Dinner for two',
+    amount: 72,
+    category: 'Dining',
+  },
+  {
+    id: 'hotel',
+    merchant: 'Marriott',
+    description: 'A one-night hotel stay',
+    amount: 240,
+    category: 'Travel',
+  },
+  {
+    id: 'market',
+    merchant: 'Whole Foods',
+    description: 'Fresh groceries',
+    amount: 110,
+    category: 'Groceries',
+  },
+  {
+    id: 'road-trip',
+    merchant: 'Exxon',
+    description: 'Fuel for a road trip',
+    amount: 48,
+    category: 'Gas',
+  },
+];
+
+function createRoundSet() {
+  return [...scenarioBank]
+    .sort(() => Math.random() - 0.5)
+    .slice(0, totalRounds);
+}
+
+function calculateRewards(
+  card: RewardCard,
+  scenario: Scenario,
+) {
+  return scenario.amount * (card.rates[scenario.category] / 100);
+}
+
+function findBestCard(scenario: Scenario) {
+  return cards.reduce((bestCard, currentCard) => {
+    const bestRewards = calculateRewards(bestCard, scenario);
+    const currentRewards = calculateRewards(currentCard, scenario);
+
+    return currentRewards > bestRewards ? currentCard : bestCard;
   });
+}
+
+export default function ChallengeScreen() {
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [rounds, setRounds] = useState(createRoundSet);
+  const [roundIndex, setRoundIndex] = useState(0);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(
+    null,
+  );
+  const [score, setScore] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [bestStreak, setBestStreak] = useState(0);
+  const [finished, setFinished] = useState(false);
+
+  const scenario = rounds[roundIndex];
+  const bestCard = findBestCard(scenario);
+  const answered = selectedCardId !== null;
+  const answerIsCorrect = selectedCardId === bestCard.id;
+
+  function chooseCard(cardId: string) {
+    if (answered) {
+      return;
+    }
+
+    const correct = cardId === bestCard.id;
+    setSelectedCardId(cardId);
+
+    if (correct) {
+      const newStreak = streak + 1;
+      setScore((currentScore) => currentScore + 1);
+      setStreak(newStreak);
+      setBestStreak((currentBest) =>
+        Math.max(currentBest, newStreak),
+      );
+
+      void Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Success,
+      );
+    } else {
+      setStreak(0);
+
+      void Haptics.notificationAsync(
+        Haptics.NotificationFeedbackType.Error,
+      );
+    }
+  }
+
+  function goToNextRound() {
+    if (roundIndex === totalRounds - 1) {
+      setFinished(true);
+      return;
+    }
+
+    setRoundIndex((currentRound) => currentRound + 1);
+    setSelectedCardId(null);
+    scrollViewRef.current?.scrollTo({
+      y: 0,
+      animated: true,
+      });
+  }
+
+  function restartGame() {
+    setRounds(createRoundSet());
+    setRoundIndex(0);
+    setSelectedCardId(null);
+    setScore(0);
+    setStreak(0);
+    setBestStreak(0);
+    setFinished(false);
+  }
+
+  if (finished) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar style="light" />
+
+        <View style={styles.finishedContainer}>
+          <Text style={styles.eyebrow}>CHALLENGE COMPLETE</Text>
+          <Text style={styles.finalScore}>
+            {score}/{totalRounds}
+          </Text>
+          <Text style={styles.finalTitle}>
+            {score === totalRounds
+              ? 'Rewards expert!'
+              : score >= 3
+                ? 'Great card instincts!'
+                : 'Keep practicing!'}
+          </Text>
+          <Text style={styles.finalDescription}>
+            Your longest correct-answer streak was {bestStreak}.
+            Replay to receive a different mix of purchases.
+          </Text>
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={restartGame}
+            style={({ pressed }) => [
+              styles.primaryButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={styles.primaryButtonText}>
+              Play again
+            </Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <ScrollView
-      style={[styles.scrollView, { backgroundColor: theme.background }]}
-      contentInset={insets}
-      contentContainerStyle={[styles.contentContainer, contentPlatformStyle]}>
-      <ThemedView style={styles.container}>
-        <ThemedView style={styles.titleContainer}>
-          <ThemedText type="subtitle">Explore</ThemedText>
-          <ThemedText style={styles.centerText} themeColor="textSecondary">
-            This starter app includes example{'\n'}code to help you get started.
-          </ThemedText>
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar style="light" />
 
-          <ExternalLink href="https://docs.expo.dev" asChild>
-            <Pressable style={({ pressed }) => pressed && styles.pressed}>
-              <ThemedView type="backgroundElement" style={styles.linkButton}>
-                <ThemedText type="link">Expo documentation</ThemedText>
-                <SymbolView
-                  tintColor={theme.text}
-                  name={{ ios: 'arrow.up.right.square', android: 'link', web: 'link' }}
-                  size={12}
-                />
-              </ThemedView>
+      <ScrollView
+        ref={scrollViewRef}
+        contentContainerStyle={styles.container}
+        >
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={styles.eyebrow}>
+              REWARDS CHALLENGE
+            </Text>
+            <Text style={styles.title}>
+              Pick the best card
+            </Text>
+          </View>
+
+          <View style={styles.scoreBadge}>
+            <Text style={styles.scoreLabel}>SCORE</Text>
+            <Text style={styles.scoreValue}>
+              {score}/{totalRounds}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.progressRow}>
+          {rounds.map((round, index) => (
+            <View
+              key={round.id}
+              style={[
+                styles.progressSegment,
+                index <= roundIndex &&
+                  styles.progressSegmentActive,
+              ]}
+            />
+          ))}
+        </View>
+
+        <Text style={styles.roundLabel}>
+          ROUND {roundIndex + 1} OF {totalRounds}
+        </Text>
+
+        <View style={styles.scenarioCard}>
+          <Text style={styles.category}>
+            {scenario.category.toUpperCase()}
+          </Text>
+          <Text style={styles.merchant}>
+            {scenario.merchant}
+          </Text>
+          <Text style={styles.description}>
+            {scenario.description}
+          </Text>
+          <Text style={styles.amount}>
+            ${scenario.amount.toFixed(2)}
+          </Text>
+        </View>
+
+        <Text style={styles.prompt}>
+          Which card earns the most rewards?
+        </Text>
+
+        {cards.map((card) => {
+          const selected = selectedCardId === card.id;
+          const isBest = card.id === bestCard.id;
+
+          return (
+            <Pressable
+              accessibilityRole="button"
+              disabled={answered}
+              key={card.id}
+              onPress={() => chooseCard(card.id)}
+              style={[
+                styles.cardOption,
+                selected &&
+                  answerIsCorrect &&
+                  styles.correctOption,
+                selected &&
+                  !answerIsCorrect &&
+                  styles.incorrectOption,
+                answered &&
+                  isBest &&
+                  styles.bestOption,
+              ]}
+            >
+              <View style={styles.cardInformation}>
+                <Text style={styles.cardName}>
+                  {card.name}
+                </Text>
+                <Text style={styles.cardDetails}>
+                  •••• {card.lastFour} ·{' '}
+                  {card.rates[scenario.category]}%{' '}
+                  {scenario.category}
+                </Text>
+              </View>
+
+              {answered ? (
+                <Text style={styles.rewardValue}>
+                  $
+                  {calculateRewards(
+                    card,
+                    scenario,
+                  ).toFixed(2)}
+                </Text>
+              ) : (
+                <Text style={styles.selectText}>SELECT</Text>
+              )}
             </Pressable>
-          </ExternalLink>
-        </ThemedView>
+          );
+        })}
 
-        <ThemedView style={styles.sectionsWrapper}>
-          <Collapsible title="File-based routing">
-            <ThemedText type="small">
-              This app has two screens: <ThemedText type="code">src/app/index.tsx</ThemedText> and{' '}
-              <ThemedText type="code">src/app/explore.tsx</ThemedText>
-            </ThemedText>
-            <ThemedText type="small">
-              The layout file in <ThemedText type="code">src/app/_layout.tsx</ThemedText> sets up
-              the tab navigator.
-            </ThemedText>
-            <ExternalLink href="https://docs.expo.dev/router/introduction">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
+        {answered ? (
+          <View
+            style={[
+              styles.feedback,
+              answerIsCorrect
+                ? styles.correctFeedback
+                : styles.incorrectFeedback,
+            ]}
+          >
+            <Text style={styles.feedbackTitle}>
+              {answerIsCorrect
+                ? 'Correct!'
+                : 'Not quite'}
+            </Text>
 
-          <Collapsible title="Android, iOS, and web support">
-            <ThemedView type="backgroundElement" style={styles.collapsibleContent}>
-              <ThemedText type="small">
-                You can open this project on Android, iOS, and the web. To open the web version,
-                press <ThemedText type="smallBold">w</ThemedText> in the terminal running this
-                project.
-              </ThemedText>
-              <Image
-                source={require('@/assets/images/tutorial-web.png')}
-                style={styles.imageTutorial}
-              />
-            </ThemedView>
-          </Collapsible>
+            <Text style={styles.feedbackText}>
+              {bestCard.name} earns{' '}
+              <Text style={styles.highlight}>
+                $
+                {calculateRewards(
+                  bestCard,
+                  scenario,
+                ).toFixed(2)}
+              </Text>{' '}
+              because it receives{' '}
+              {bestCard.rates[scenario.category]}% back on{' '}
+              {scenario.category.toLowerCase()} purchases.
+            </Text>
 
-          <Collapsible title="Images">
-            <ThemedText type="small">
-              For static images, you can use the <ThemedText type="code">@2x</ThemedText> and{' '}
-              <ThemedText type="code">@3x</ThemedText> suffixes to provide files for different
-              screen densities.
-            </ThemedText>
-            <Image source={require('@/assets/images/react-logo.png')} style={styles.imageReact} />
-            <ExternalLink href="https://reactnative.dev/docs/images">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
+            <Text style={styles.streak}>
+              Current streak: {streak}
+            </Text>
+          </View>
+        ) : null}
 
-          <Collapsible title="Light and dark mode components">
-            <ThemedText type="small">
-              This template has light and dark mode support. The{' '}
-              <ThemedText type="code">useColorScheme()</ThemedText> hook lets you inspect what the
-              user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-            </ThemedText>
-            <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
-
-          <Collapsible title="Animations">
-            <ThemedText type="small">
-              This template includes an example of an animated component. The{' '}
-              <ThemedText type="code">src/components/ui/collapsible.tsx</ThemedText> component uses
-              the powerful <ThemedText type="code">react-native-reanimated</ThemedText> library to
-              animate opening this hint.
-            </ThemedText>
-          </Collapsible>
-        </ThemedView>
-        {Platform.OS === 'web' && <WebBadge />}
-      </ThemedView>
-    </ScrollView>
+        {answered ? (
+          <Pressable
+            accessibilityRole="button"
+            onPress={goToNextRound}
+            style={({ pressed }) => [
+              styles.primaryButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={styles.primaryButtonText}>
+              {roundIndex === totalRounds - 1
+                ? 'See final score'
+                : 'Next purchase'}
+            </Text>
+          </Pressable>
+        ) : null}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
+const colors = {
+  background: '#080806',
+  panel: '#181611',
+  panelStrong: '#211b10',
+  border: '#3d3527',
+  gold: '#d3a958',
+  lightGold: '#f0cf83',
+  text: '#f7f1e7',
+  muted: '#aaa398',
+  success: '#70bd78',
+  successBackground: '#102116',
+  danger: '#ef8177',
+  dangerBackground: '#2b1312',
+};
+
 const styles = StyleSheet.create({
-  scrollView: {
+  safeArea: {
     flex: 1,
-  },
-  contentContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
+    backgroundColor: colors.background,
   },
   container: {
-    maxWidth: MaxContentWidth,
-    flexGrow: 1,
+    paddingHorizontal: 20,
+    paddingTop: 28,
+    paddingBottom: 130,
   },
-  titleContainer: {
-    gap: Spacing.three,
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  eyebrow: {
+    color: colors.lightGold,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.8,
+    marginBottom: 8,
+  },
+  title: {
+    color: colors.text,
+    fontSize: 30,
+    fontWeight: '700',
+  },
+  scoreBadge: {
+    backgroundColor: colors.panel,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
     alignItems: 'center',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.six,
   },
-  centerText: {
-    textAlign: 'center',
+  scoreLabel: {
+    color: colors.muted,
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 1.1,
+  },
+  scoreValue: {
+    color: colors.lightGold,
+    fontSize: 18,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    gap: 7,
+    marginTop: 24,
+  },
+  progressSegment: {
+    flex: 1,
+    height: 5,
+    backgroundColor: colors.border,
+    borderRadius: 99,
+  },
+  progressSegmentActive: {
+    backgroundColor: colors.gold,
+  },
+  roundLabel: {
+    color: colors.muted,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.3,
+    marginTop: 18,
+  },
+  scenarioCard: {
+    backgroundColor: colors.panelStrong,
+    borderColor: colors.gold,
+    borderWidth: 1,
+    borderRadius: 20,
+    padding: 22,
+    marginTop: 10,
+  },
+  category: {
+    color: colors.lightGold,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.4,
+  },
+  merchant: {
+    color: colors.text,
+    fontSize: 27,
+    fontWeight: '700',
+    marginTop: 8,
+  },
+  description: {
+    color: colors.muted,
+    fontSize: 14,
+    marginTop: 5,
+  },
+  amount: {
+    color: colors.lightGold,
+    fontSize: 30,
+    fontWeight: '800',
+    marginTop: 20,
+  },
+  prompt: {
+    color: colors.text,
+    fontSize: 17,
+    fontWeight: '700',
+    marginTop: 26,
+    marginBottom: 12,
+  },
+  cardOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.panel,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 10,
+  },
+  correctOption: {
+    borderColor: colors.success,
+    backgroundColor: colors.successBackground,
+  },
+  incorrectOption: {
+    borderColor: colors.danger,
+    backgroundColor: colors.dangerBackground,
+  },
+  bestOption: {
+    borderColor: colors.success,
+  },
+  cardInformation: {
+    flex: 1,
+  },
+  cardName: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  cardDetails: {
+    color: colors.muted,
+    fontSize: 12,
+    marginTop: 5,
+  },
+  selectText: {
+    color: colors.gold,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  rewardValue: {
+    color: colors.lightGold,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  feedback: {
+    borderWidth: 1,
+    borderRadius: 16,
+    padding: 17,
+    marginTop: 8,
+  },
+  correctFeedback: {
+    backgroundColor: colors.successBackground,
+    borderColor: colors.success,
+  },
+  incorrectFeedback: {
+    backgroundColor: colors.dangerBackground,
+    borderColor: colors.danger,
+  },
+  feedbackTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  feedbackText: {
+    color: colors.muted,
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: 6,
+  },
+  highlight: {
+    color: colors.lightGold,
+    fontWeight: '800',
+  },
+  streak: {
+    color: colors.lightGold,
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 10,
+  },
+  primaryButton: {
+    minHeight: 54,
+    backgroundColor: colors.gold,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+  },
+  primaryButtonText: {
+    color: '#171105',
+    fontSize: 16,
+    fontWeight: '800',
   },
   pressed: {
-    opacity: 0.7,
+    opacity: 0.75,
   },
-  linkButton: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.five,
+  finishedContainer: {
+    flex: 1,
     justifyContent: 'center',
-    gap: Spacing.one,
-    alignItems: 'center',
+    paddingHorizontal: 28,
   },
-  sectionsWrapper: {
-    gap: Spacing.five,
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.three,
+  finalScore: {
+    color: colors.lightGold,
+    fontSize: 78,
+    fontWeight: '800',
+    letterSpacing: -4,
   },
-  collapsibleContent: {
-    alignItems: 'center',
+  finalTitle: {
+    color: colors.text,
+    fontSize: 30,
+    fontWeight: '700',
+    marginTop: 6,
   },
-  imageTutorial: {
-    width: '100%',
-    aspectRatio: 296 / 171,
-    borderRadius: Spacing.three,
-    marginTop: Spacing.two,
-  },
-  imageReact: {
-    width: 100,
-    height: 100,
-    alignSelf: 'center',
+  finalDescription: {
+    color: colors.muted,
+    fontSize: 16,
+    lineHeight: 24,
+    marginTop: 12,
+    marginBottom: 12,
   },
 });
